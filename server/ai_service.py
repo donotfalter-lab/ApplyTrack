@@ -6,7 +6,7 @@ import httpx
 from google import genai
 from google.genai import errors, types
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-3.8-flash"
 MAX_OUTPUT_TOKENS = 500
 TIMEOUT_MS = 30_000
 
