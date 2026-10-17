@@ -58,7 +58,7 @@ class Application(db.Model):
 
     @validates("company", "role")
     def validate_not_blank(self, key, value):
-        if not value or not value.strip():
+        if not isinstance(value, str) or not value.strip():
             raise ValueError(f"{key} must not be empty.")
         return value.strip()
 
@@ -66,6 +66,12 @@ class Application(db.Model):
     def validate_status(self, key, value):
         if value not in VALID_STATUSES:
             raise ValueError(f"status must be one of: {', '.join(VALID_STATUSES)}.")
+        return value
+
+    @validates("job_description")
+    def validate_job_description(self, key, value):
+        if value is not None and not isinstance(value, str):
+            raise ValueError("job_description must be text.")
         return value
 
     def to_dict(self):
