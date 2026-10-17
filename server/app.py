@@ -2,11 +2,14 @@ from flask import request
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
 from sqlalchemy.exc import IntegrityError
 
+from ai_service import AIServiceError, generate_response
 from config import app, db, jwt
 from models import Application, Response, User
 
 MIN_PASSWORD_LENGTH = 8
 APPLICATION_FIELDS = ("company", "role", "status", "job_description")
+QUESTION_MIN_LENGTH = 5
+QUESTION_MAX_LENGTH = 1000
 
 
 def error(message, status):
@@ -221,6 +224,39 @@ def list_responses(application_id):
         return error("Not found", 404)
     return [r.to_dict() for r in newest_responses(application)], 200
 
+
+@app.post("/applications/<int:application_id>/responses")
+@jwt_required()
+def create_response(application_id):
+    application = owned_application(application_id)
+    if not application:
+        return error("Not found", 404)
+
+    data = json_body()
+    if data is None:
+        return error("Request body must be a JSON object", 400)
+
+    question = data.get("question")
+    if not isinstance(question, str) or not question.strip():
+        return error("Question is required", 400)
+    question = question.strip()
+    if not QUESTION_MIN_LENGTH <= len(question) <= QUESTION_MAX_LENGTH:
+        return error(
+            f"Question must be {QUESTION_MIN_LENGTH} to {QUESTION_MAX_LENGTH} characters", 400
+        )
+
+    try:
+        generated_text = generate_response(
+            question, application.company, application.role, application.job_description
+        )
+    except AIServiceError as e:
+        db.session.rollback()
+        return error(e.message, e.status_code)
+
+    response = Response(prompt=question, generated_text=generated_text, application=application)
+    db.session.add(response)
+    commit()
+    return response.to_dict(), 201
 
 @app.delete("/responses/<int:response_id>")
 @jwt_required()
